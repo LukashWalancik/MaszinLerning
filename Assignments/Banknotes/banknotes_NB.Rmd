@@ -36,6 +36,9 @@ plt.rcParams['figure.figsize']=(8,8)
 
 Please insert you  firstname  and name below
 
+
+# Łukasz Walancik
+
 ```{python}
 from  sklearn.model_selection import train_test_split
 seed = 31287
@@ -101,8 +104,86 @@ from sklearn.metrics import roc_auc_score, roc_curve, confusion_matrix
 Which feature did you choose?
 <!-- #endregion -->
 
+I am choosing feature __a0__, as the histogram shows, at least in my opinion the smallest overlap between counterfeit and real banknotes for this feature.
+
 ```{python editable=TRUE, slideshow={'slide_type': ''}}
+data_train = data_train[['a0', 'counterfeit']]
+```
+
+```{python}
 data_train
+```
+
+## Choosing a0 feature and creating NB model
+
+```{python}
+X_train = data_train.iloc[:, [0]]
+X_test = data_test.iloc[:, [0]]
+
+y_train = data_train['counterfeit']
+y_test = data_test['counterfeit']
+```
+
+Here I am creating a Naive Bayes model, and training it based on training dataset
+
+```{python}
+gnb = GaussianNB()
+gnb.fit(X_train, y_train)
+```
+
+Here I am using trained model to predict data based on both training and testing datasets. I also create confusion matrices
+
+
+## Confusion Matrix
+
+```{python}
+y_train_pred = gnb.predict(X_train)
+y_test_pred = gnb.predict(X_test)
+
+cm_train = confusion_matrix(y_train, y_train_pred, normalize='true')
+cm_test = confusion_matrix(y_test, y_test_pred, normalize='true')
+```
+
+Here I am displaying confusion matrices
+
+```{python}
+fig, ax = plt.subplots(1, 2)
+
+disp_train = ConfusionMatrixDisplay(confusion_matrix=cm_train, display_labels=gnb.classes_)
+disp_train.plot(cmap='Blues', ax=ax[0], colorbar=False)
+ax[0].set_title('Confusion Matrix – Train')
+
+disp_test = ConfusionMatrixDisplay(confusion_matrix=cm_test, display_labels=gnb.classes_)
+disp_test.plot(cmap='Oranges', ax=ax[1], colorbar=False)
+ax[1].set_title('Confusion Matrix – Test')
+
+plt.tight_layout()
+plt.show()
+```
+
+## ROC Curve and AUC
+
+```{python}
+y_train_proba = gnb.predict_proba(X_train)[:, 1]
+y_test_proba = gnb.predict_proba(X_test)[:, 1]
+
+fpr_train, tpr_train, _ = roc_curve(y_train, y_train_proba)
+fpr_test_one_feature, tpr_test_one_feature, _ = roc_curve(y_test, y_test_proba)
+
+auc_train = roc_auc_score(y_train, y_train_proba)
+auc_test_one_feature = roc_auc_score(y_test, y_test_proba)
+```
+
+```{python}
+plt.plot(fpr_train, tpr_train, label=f'Train ROC (AUC = {auc_train:.2f})')
+plt.plot(fpr_test_one_feature, tpr_test_one_feature, label=f'Test ROC (AUC = {auc_test_one_feature:.2f})')
+plt.plot([0, 1], [0, 1], 'k--', label='Random classifier')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curve for feature a0')
+plt.grid()
+plt.legend(loc='lower right')
+plt.show()
 ```
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
@@ -112,6 +193,82 @@ data_train
 <!-- #region editable=true slideshow={"slide_type": ""} -->
 Same as Problem 1 but now construct Gaussian Naive Bayes using two features. Additionally  compare ROC curve obtained with this and previous  classifier on the test set. What is the improvement of AUC score on the test set?
 <!-- #endregion -->
+
+```{python}
+data_train, data_test = train_test_split(data, test_size=0.2, shuffle=True, stratify=data.loc[:,'counterfeit'], random_state=seed)
+data_train = data_train[['a0', 'a1', 'counterfeit']]
+```
+
+```{python}
+X_train = data_train.iloc[:, [0,1]]
+X_test = data_test.iloc[:, [0,1]]
+
+y_train = data_train['counterfeit']
+y_test = data_test['counterfeit']
+```
+
+```{python}
+gnb = GaussianNB()
+gnb.fit(X_train, y_train)
+```
+
+```{python}
+y_train_pred = gnb.predict(X_train)
+y_test_pred = gnb.predict(X_test)
+
+cm_train = confusion_matrix(y_train, y_train_pred, normalize='true')
+cm_test = confusion_matrix(y_test, y_test_pred, normalize='true')
+```
+
+```{python}
+fig, ax = plt.subplots(1, 2)
+
+disp_train = ConfusionMatrixDisplay(confusion_matrix=cm_train, display_labels=gnb.classes_)
+disp_train.plot(cmap='Blues', ax=ax[0], colorbar=False)
+ax[0].set_title('Confusion Matrix – Train')
+
+disp_test = ConfusionMatrixDisplay(confusion_matrix=cm_test, display_labels=gnb.classes_)
+disp_test.plot(cmap='Oranges', ax=ax[1], colorbar=False)
+ax[1].set_title('Confusion Matrix – Test')
+
+plt.tight_layout()
+plt.show()
+```
+
+```{python}
+y_train_proba = gnb.predict_proba(X_train)[:, 1]
+y_test_proba = gnb.predict_proba(X_test)[:, 1]
+
+fpr_train, tpr_train, _ = roc_curve(y_train, y_train_proba)
+fpr_test, tpr_test, _ = roc_curve(y_test, y_test_proba)
+
+auc_train = roc_auc_score(y_train, y_train_proba)
+auc_test = roc_auc_score(y_test, y_test_proba)
+```
+
+```{python}
+plt.plot(fpr_train, tpr_train, label=f'Train ROC (AUC = {auc_train:.2f})')
+plt.plot(fpr_test, tpr_test, label=f'Test ROC (AUC = {auc_test:.2f})')
+plt.plot([0, 1], [0, 1], 'k--', label='Random classifier')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curve for features a0 and a1')
+plt.grid()
+plt.legend(loc='lower right')
+plt.show()
+```
+
+```{python}
+plt.plot(fpr_test, tpr_test, label=f'Test ROC Two Features (AUC = {auc_test:.2f})')
+plt.plot(fpr_test_one_feature, tpr_test_one_feature, label=f'Test ROC One Feature (AUC = {auc_test_one_feature:.2f})')
+plt.plot([0, 1], [0, 1], 'k--', label='Random classifier')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curve')
+plt.grid()
+plt.legend(loc='lower right')
+plt.show()
+```
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
 ## Problem 3
