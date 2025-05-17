@@ -240,15 +240,15 @@ y_train_proba = gnb.predict_proba(X_train)[:, 1]
 y_test_proba = gnb.predict_proba(X_test)[:, 1]
 
 fpr_train, tpr_train, _ = roc_curve(y_train, y_train_proba)
-fpr_test, tpr_test, _ = roc_curve(y_test, y_test_proba)
+fpr_test_two_features, tpr_test_two_features, _ = roc_curve(y_test, y_test_proba)
 
 auc_train = roc_auc_score(y_train, y_train_proba)
-auc_test = roc_auc_score(y_test, y_test_proba)
+auc_test_two_features = roc_auc_score(y_test, y_test_proba)
 ```
 
 ```{python}
 plt.plot(fpr_train, tpr_train, label=f'Train ROC (AUC = {auc_train:.2f})')
-plt.plot(fpr_test, tpr_test, label=f'Test ROC (AUC = {auc_test:.2f})')
+plt.plot(fpr_test_two_features, tpr_test_two_features, label=f'Test ROC (AUC = {auc_test_two_features:.2f})')
 plt.plot([0, 1], [0, 1], 'k--', label='Random classifier')
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
@@ -259,7 +259,7 @@ plt.show()
 ```
 
 ```{python}
-plt.plot(fpr_test, tpr_test, label=f'Test ROC Two Features (AUC = {auc_test:.2f})')
+plt.plot(fpr_test_two_features, tpr_test_two_features, label=f'Test ROC Two Features (AUC = {auc_test_two_features:.2f})')
 plt.plot(fpr_test_one_feature, tpr_test_one_feature, label=f'Test ROC One Feature (AUC = {auc_test_one_feature:.2f})')
 plt.plot([0, 1], [0, 1], 'k--', label='Random classifier')
 plt.xlabel('False Positive Rate')
@@ -277,3 +277,62 @@ plt.show()
 ```{python editable=TRUE, raw_mimetype="", slideshow={'slide_type': ''}, active="", eval=FALSE}
 Same as Problem 2 but now implement Gaussian Naive Bayes using all features. Show confusion matrix only for test set. Compare all three ROC curves on the test set, same with AUC score.
 ```
+
+```{python}
+data_train, data_test = train_test_split(data, test_size=0.2, shuffle=True, stratify=data.loc[:,'counterfeit'], random_state=seed)
+```
+
+```{python}
+X_train = data_train.iloc[:, [0,1,2,3]]
+X_test = data_test.iloc[:, [0,1,2,3]]
+
+y_train = data_train['counterfeit']
+y_test = data_test['counterfeit']
+```
+
+```{python}
+gnb = GaussianNB()
+gnb.fit(X_train, y_train)
+```
+
+```{python}
+y_test_pred = gnb.predict(X_test)
+
+cm_test = confusion_matrix(y_test, y_test_pred, normalize='true')
+```
+
+```{python}
+disp_test = ConfusionMatrixDisplay(confusion_matrix=cm_test, display_labels=gnb.classes_)
+disp_test.plot(cmap='Oranges')
+plt.title('Confusion Matrix – Test')
+plt.show()
+```
+
+```{python}
+y_train_proba = gnb.predict_proba(X_train)[:, 1]
+y_test_proba = gnb.predict_proba(X_test)[:, 1]
+
+fpr_train, tpr_train, _ = roc_curve(y_train, y_train_proba)
+fpr_test, tpr_test, _ = roc_curve(y_test, y_test_proba)
+
+auc_train = roc_auc_score(y_train, y_train_proba)
+auc_test = roc_auc_score(y_test, y_test_proba)
+```
+
+```{python}
+plt.plot(fpr_test, tpr_test, label=f'Test ROC All Features (AUC = {auc_test:.2f})')
+plt.plot(fpr_test_two_features, tpr_test_two_features, label=f'Test ROC Two Features (AUC = {auc_test:.2f})')
+plt.plot(fpr_test_one_feature, tpr_test_one_feature, label=f'Test ROC One Feature (AUC = {auc_test_one_feature:.2f})')
+plt.plot([0, 1], [0, 1], 'k--', label='Random classifier')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curve')
+plt.grid()
+plt.legend(loc='lower right')
+plt.show()
+```
+
+## Final remarks
+
+
+We can observe, that for all 4 features, our confusion matrix got worse, and the AUC score remained the same as it was.
