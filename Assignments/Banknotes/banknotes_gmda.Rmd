@@ -33,6 +33,52 @@ data = pd.read_csv('data/banknote_authentication.csv' )
 data.head()
 ```
 
+### Useful method for calculating and displaying Confusion Matrix, AUC Score and ROV Curve
+
+```{python}
+def evaluate_classifier_compare(y_train_true, y_train_pred, y_train_proba, y_test_true, y_test_pred, y_test_proba, classifier):
+    """
+    This will calculate and diplay the Confusion Matrix, AUC Score and ROC Curve
+
+    I made this because there was too much redundant code in the previous exercise.
+    """
+    cm_train = confusion_matrix(y_train_true, y_train_pred, normalize='true')
+    cm_test = confusion_matrix(y_test_true, y_test_pred, normalize='true')
+
+    fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+    disp_train = ConfusionMatrixDisplay(confusion_matrix=cm_train, display_labels=[0, 1])
+    disp_train.plot(cmap='Blues', ax=ax[0], colorbar=False)
+    ax[0].set_title('Confusion Matrix – Train')
+
+    disp_test = ConfusionMatrixDisplay(confusion_matrix=cm_test, display_labels=[0, 1])
+    disp_test.plot(cmap='Oranges', ax=ax[1], colorbar=False)
+    ax[1].set_title('Confusion Matrix – Test')
+
+    plt.tight_layout()
+    plt.suptitle(f'{classifier} Confusion Matrices', y=1.02, fontsize=16)
+    plt.show()
+
+    auc_train = roc_auc_score(y_train_true, y_train_proba)
+    auc_test = roc_auc_score(y_test_true, y_test_proba)
+
+    print(f"\nAUC Score (Train): {auc_train:.4f}")
+    print(f"AUC Score (Test): {auc_test:.4f}")
+
+    fpr_train, tpr_train, _ = roc_curve(y_train_true, y_train_proba)
+    fpr_test, tpr_test, _ = roc_curve(y_test_true, y_test_proba)
+
+    plt.figure(figsize=(8, 7))
+    plt.plot(fpr_train, tpr_train, label=f'Train ROC (AUC = {auc_train:.4f})')
+    plt.plot(fpr_test, tpr_test, label=f'Test ROC (AUC = {auc_test:.4f})')
+    plt.plot([0, 1], [0, 1], 'k--', label='Random classifier')
+    plt.xlabel('False Positive Rate (FPR)')
+    plt.ylabel('True Positive Rate (TPR)')
+    plt.title(f'ROC Curve for {classifier}')
+    plt.grid()
+    plt.legend(loc='lower right')
+    plt.show()
+```
+
 ## Problem 
 
 
@@ -42,11 +88,121 @@ data.head()
 Perform the Quadratic Discriminant Analysis on this set. Calculate the confusion matrix, AUC score and plot the ROC curve. 
 
 
+## QDA
+
+```{python}
+from sklearn.model_selection import train_test_split
+from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+from sklearn.metrics import roc_auc_score, roc_curve, confusion_matrix, ConfusionMatrixDisplay
+```
+
+```{python}
+plt.rcParams['figure.figsize']=(8,8)
+```
+
+```{python}
+seed = 31287
+```
+
+```{python}
+features = ['a1', 'a2', 'a3']
+target = 'counterfeit'
+
+X = data[features]
+y = data[target]
+```
+
+```{python}
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=True, stratify=y, random_state=seed)
+```
+
+### QDA Model
+
+
+Code below will create a QDA model and fit it using baknotes dataset.
+
+```{python}
+qda = QuadraticDiscriminantAnalysis()
+qda.fit(X_train, y_train)
+```
+
+## Confusion Matrix, AUC Score, ROC Curve
+
+
+In this section I will calculate and display Confusion Matrix, AUC Score and ROC Curve.
+
+```{python}
+y_train_pred = qda.predict(X_train)
+y_test_pred = qda.predict(X_test)
+y_train_proba = qda.predict_proba(X_train)[:, 1]
+QDA_y_test_proba = qda.predict_proba(X_test)[:, 1]
+```
+
+```{python}
+evaluate_classifier_compare(y_train, y_train_pred, y_train_proba, y_test, y_test_pred, QDA_y_test_proba, classifier="QDA")
+```
+
 ### B.
 
 
 Perform Gaussian Mixture Discriminant Analysis on this set as described in the `gaussian_mixture_model_EM_algorithm` notebook. Use two components for positives and two components for negatives. Calculate the confusion matrix, AUC score and plot the ROC curve. 
 
+
+## GMDA 
+
+
+In this section I will create and train the Gaussian Mixture model fron the sklearn
+
+```{python}
+from sklearn.mixture import GaussianMixture
+```
+
+```{python}
+X_train_class_0 = X_train[y_train == 0]
+X_train_class_1 = X_train[y_train == 1]
+
+gmm_class_0 = GaussianMixture(n_components=2, random_state=seed)
+gmm_class_1 = GaussianMixture(n_components=2, random_state=seed)
+
+gmm_class_0.fit(X_train_class_0)
+gmm_class_1.fit(X_train_class_1)
+
+prior_class_0 = y_train.value_counts(normalize=True)[0]
+prior_class_1 = y_train.value_counts(normalize=True)[1]
+```
+
+## Confusion Matrix, AUC Score and ROC Curve
+
+```{python}
+def predict_proba_gmda(X_data, gmm_0, gmm_1, prior_0, prior_1):
+    log_likelihood_0 = gmm_0.score_samples(X_data)
+    
+    log_likelihood_1 = gmm_1.score_samples(X_data)
+    
+    log_posterior_0 = log_likelihood_0 + np.log(prior_0)
+    log_posterior_1 = log_likelihood_1 + np.log(prior_1)
+    
+    log_posteriors = np.c_[log_posterior_0, log_posterior_1]
+    
+    max_log_posterior = np.max(log_posteriors, axis=1, keepdims=True)
+    exp_log_posteriors = np.exp(log_posteriors - max_log_posterior)
+    
+    probabilities = exp_log_posteriors / np.sum(exp_log_posteriors, axis=1, keepdims=True)
+    
+    return probabilities
+```
+
+```{python}
+y_train_proba_gmda = predict_proba_gmda(X_train, gmm_class_0, gmm_class_1, prior_class_0, prior_class_1)
+y_test_proba_gmda = predict_proba_gmda(X_test, gmm_class_0, gmm_class_1, prior_class_0, prior_class_1)
+
+y_train_pred_gmda = np.argmax(y_train_proba_gmda, axis=1)
+y_test_pred_gmda = np.argmax(y_test_proba_gmda, axis=1)
+```
+
+```{python}
+evaluate_classifier_compare(y_train, y_train_pred_gmda, y_train_proba_gmda[:, 1], y_test, y_test_pred_gmda, y_test_proba_gmda[:, 1], classifier="GMDA (2 Components)")
+```
 
 ### C.
 
@@ -56,12 +212,159 @@ Use k-fold cross validation to find the optimal number of gaussian components fo
 
 __Hint__ use the `StratifiedKFold` function from scikit-learn library to generate folds. 
 
+```{python}
+from sklearn.model_selection import StratifiedKFold
+```
+
+```{python}
+max_components = 12
+
+best_auc = -1
+best_n_components_0 = 0
+best_n_components_1 = 0
+best_gmm_0 = None
+best_gmm_1 = None
+
+kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
+```
+
+```{python}
+for n_comp_0 in range(1, max_components + 1):
+    for n_comp_1 in range(1, max_components + 1):
+        fold_auc_scores = []
+
+        for train_index, val_index in kf.split(X_train, y_train):
+            X_train_fold, X_val_fold = X_train.iloc[train_index], X_train.iloc[val_index]
+            y_train_fold, y_val_fold = y_train.iloc[train_index], y_train.iloc[val_index]
+
+            X_train_fold_class_0 = X_train_fold[y_train_fold == 0]
+            X_train_fold_class_1 = X_train_fold[y_train_fold == 1]
+
+            gmm_0_fold = GaussianMixture(n_components=n_comp_0, random_state=seed)
+            gmm_1_fold = GaussianMixture(n_components=n_comp_1, random_state=seed)
+
+            if len(X_train_fold_class_0) > 0 and n_comp_0 <= len(X_train_fold_class_0):
+                 gmm_0_fold.fit(X_train_fold_class_0)
+            else:
+                if len(X_train_fold_class_0) == 0:
+                     gmm_0_fold = GaussianMixture(n_components=1, random_state=seed).fit(X_train_fold_class_0)
+                else:
+                    continue
+
+            if len(X_train_fold_class_1) > 0 and n_comp_1 <= len(X_train_fold_class_1):
+                 gmm_1_fold.fit(X_train_fold_class_1)
+            else:
+                if len(X_train_fold_class_1) == 0:
+                    gmm_1_fold = GaussianMixture(n_components=1, random_state=seed).fit(X_train_fold_class_1)
+                else:
+                    continue
+
+            prior_0_fold = y_train_fold.value_counts(normalize=True)[0]
+            prior_1_fold = y_train_fold.value_counts(normalize=True)[1]
+
+            y_val_proba_gmda_fold = predict_proba_gmda(X_val_fold, gmm_0_fold, gmm_1_fold, prior_0_fold, prior_1_fold)
+            fold_auc_scores.append(roc_auc_score(y_val_fold, y_val_proba_gmda_fold[:, 1]))
+
+        if fold_auc_scores:
+            mean_auc = np.mean(fold_auc_scores)
+
+            if mean_auc > best_auc:
+                best_auc = mean_auc
+                best_n_components_0 = n_comp_0
+                best_n_components_1 = n_comp_1
+                print(f"New best: n_comp_0={best_n_components_0}, n_comp_1={best_n_components_1}, Mean AUC={best_auc:.4f}")
+
+```
+
+```{python}
+print()
+print(f"Optimal number of components for class 0: {best_n_components_0}")
+print(f"Optimal number of components for class 1: {best_n_components_1}")
+print(f"Best cross-validation AUC: {best_auc:.4f}")
+
+X_train_class_0_final = X_train[y_train == 0]
+X_train_class_1_final = X_train[y_train == 1]
+
+final_gmm_0 = GaussianMixture(n_components=best_n_components_0, random_state=seed)
+final_gmm_1 = GaussianMixture(n_components=best_n_components_1, random_state=seed)
+
+final_gmm_0.fit(X_train_class_0_final)
+final_gmm_1.fit(X_train_class_1_final)
+
+prior_class_0_final = y_train.value_counts(normalize=True)[0]
+prior_class_1_final = y_train.value_counts(normalize=True)[1]
+
+y_train_proba_gmda_optimal_final_model = predict_proba_gmda(X_train, final_gmm_0, final_gmm_1, prior_class_0_final, prior_class_1_final)
+y_train_pred_gmda_optimal_final_model = np.argmax(y_train_proba_gmda_optimal_final_model, axis=1)
+
+y_test_proba_gmda_optimal = predict_proba_gmda(X_test, final_gmm_0, final_gmm_1, prior_class_0_final, prior_class_1_final)
+y_test_pred_gmda_optimal = np.argmax(y_test_proba_gmda_optimal, axis=1)
+
+evaluate_classifier_compare(y_train, y_train_pred_gmda_optimal_final_model, y_train_proba_gmda_optimal_final_model[:, 1], y_test, y_test_pred_gmda_optimal, y_test_proba_gmda_optimal[:, 1], classifier=f"GMDA Optimal")
+```
 
 ## D.  
 
 
 Assume that 1% of all the customers in your store try to pay with a counterfeit 100PLN bill. If you accept the counterfeit bill you loose 100PLN. If you reject a valid bill,  you may loose the purchase, you estimate this loss as 15PLN on average. For each of the three classifiers find the threshold that minimises your losses and calculates the minimum loss for each classifier. Show the optimal classifiers points on the ROC curves.
 
-```{python editable=TRUE, slideshow={'slide_type': ''}}
+```{python}
+def calculate_loss(fpr, tpr, cost_fp, cost_fn, prior_valid, prior_counterfeit):
+    return cost_fp * fpr * prior_valid + cost_fn * (1 - tpr) * prior_counterfeit
+```
 
+```{python}
+def make_plot_and_calculate_optimal_values(y_test, y_test_proba, classifier: str):
+    fpr, tpr, thresholds = roc_curve(y_test, y_test_proba)
+
+    losses = []
+    for i, threshold in enumerate(thresholds):
+        loss = calculate_loss(fpr[i], tpr[i], cost_fp, cost_fn, prior_valid, prior_counterfeit)
+        losses.append(loss)
+
+    min_loss = np.min(losses)
+    optimal_index = np.argmin(losses)
+    optimal_threshold = thresholds[optimal_index]
+    optimal_fpr = fpr[optimal_index]
+    optimal_tpr = tpr[optimal_index]
+
+    print(f"Minimal loss for {classifier}: {min_loss:.4f} PLN")
+    print(f"Optimal threshold for {classifier}: {optimal_threshold:.4f}")
+    print(f"Corresponding FPR: {optimal_fpr:.4f}, TPR: {optimal_tpr:.4f}")
+
+    plt.figure(figsize=(8, 7))
+    plt.plot(fpr, tpr, label=f'Test ROC (AUC = {roc_auc_score(y_test, y_test_proba):.4f})')
+    plt.plot([0, 1], [0, 1], 'k--', label='Random classifier')
+    plt.plot(optimal_fpr, optimal_tpr, 'ro', markersize=10, label=f'Optimal point (Threshold={optimal_threshold:.2f}, Loss={min_loss:.2f} PLN)')
+    plt.xlabel('False Positive Rate (FPR)')
+    plt.ylabel('True Positive Rate (TPR)')
+    plt.title('ROC Curve for Quadratic Discriminant Analysis with Optimal Point')
+    plt.grid()
+    plt.legend(loc='lower right')
+    plt.show()
+```
+
+```{python}
+cost_fp = 15
+cost_fn = 100
+
+prior_valid = 0.99
+prior_counterfeit = 0.01
+```
+
+```{python}
+print("--- QDA Optimal Threshold and Loss ---")
+make_plot_and_calculate_optimal_values(y_test, QDA_y_test_proba, "QDA")
+```
+
+```{python}
+print()
+print("--- GMDA (2 Components) Optimal Threshold and Loss ---")
+make_plot_and_calculate_optimal_values(y_test, y_test_proba_gmda[:, 1], "GMDA")
+```
+
+```{python}
+print()
+print("--- GMDA (Optimal Components) Optimal Threshold and Loss ---")
+make_plot_and_calculate_optimal_values(y_test, y_test_proba_gmda_optimal[:, 1], "GMDA (Optimal)")
 ```
