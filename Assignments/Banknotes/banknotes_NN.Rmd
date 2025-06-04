@@ -27,6 +27,7 @@ import scipy.stats as st
 
 ```{python}
 from sklearn.metrics import classification_report, ConfusionMatrixDisplay
+from sklearn.metrics import roc_curve, confusion_matrix, accuracy_score, roc_auc_score
 ```
 
 ```{python}
@@ -35,6 +36,9 @@ plt.rcParams['figure.figsize']=(8,8)
 ```
 
 Please insert you  firstname  and name below
+
+
+# Łukasz Walancik
 
 ```{python}
 from  sklearn.model_selection import train_test_split
@@ -112,7 +116,7 @@ model = tnn.Sequential(tnn.Linear(in_features=nf, out_features=1), tnn.Sigmoid()
 ```
 
 ```{python editable=TRUE, slideshow={'slide_type': ''}}
-from sklearn.metrics import roc_curve, confusion_matrix, accuracy_score
+from sklearn.metrics import roc_curve, confusion_matrix, accuracy_score, roc_auc_score
 ```
 
 ```{python editable=TRUE, slideshow={'slide_type': ''}}
@@ -126,6 +130,167 @@ with torch.no_grad():
 accuracy_score(y_true, y_pred=y_predicted)
 ```
 
-```{python editable=TRUE, slideshow={'slide_type': ''}}
+## Useful Functions
+
+
+I wanted to compare different models and optimizers, so I prepared some functions that I will re-use later
+
+```{python}
+def train_model(model, loss_function, optimizer_class, number_of_epochs, learning_rate):
+    loss_list = []
+    optimizer = optimizer_class(model.parameters(), lr=learning_rate)
+    for epoch in range(num_epochs):
+        optimizer.zero_grad()
+
+        pred = model(features_train)
+
+        loss = loss_function(pred, labels_train)
+
+        loss.backward()
+
+        with torch.no_grad():
+            pred_test = model(features_test)
+            loss_test = loss_function(pred_test, labels_test)
+        loss_list.append((loss.item(), loss_test))  
+
+        optimizer.step()
+
+    return np.array(loss_list)
+```
+
+```{python}
+def show_losses(loss_list_1, loss_list_2, label_1, label_2, title, skip):
+    plt.plot(loss_list_1[::skip, 0], label=f'{label_1} Train Loss', color='blue', linestyle='-')
+    plt.plot(loss_list_1[::skip, 1], label=f'{label_1} Test Loss', color='darkblue', linestyle='--')
+    
+    plt.plot(loss_list_2[::skip, 0], label=f'{label_2} Train Loss', color='red', linestyle='-')
+    plt.plot(loss_list_2[::skip, 1], label=f'{label_2} Test Loss', color='darkred', linestyle='--')
+    
+    plt.title(f'Comaprison of loss values for different {title}')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss value')
+    plt.legend()
+    plt.tight_layout() 
+    plt.show()
+
+```
+
+## Trainig preparation
+
+
+In this section I will create a loss function, optimizer, and set number of epochs
+
+
+### Model
+
+
+### Logistic regression model
+
+```{python}
+model = tnn.Sequential(tnn.Linear(in_features=nf, out_features=1), tnn.Sigmoid())
+```
+
+### Model with more layers
+
+```{python}
+model_2 = tnn.Sequential(
+    tnn.Linear(in_features=nf, out_features=32),
+    tnn.ReLU(),
+    tnn.Linear(in_features=32, out_features=16),
+    tnn.ReLU(),
+    tnn.Linear(in_features=16, out_features=1),
+    tnn.Sigmoid()
+)
+```
+
+## Loss function
+
+
+I am using BCELoss. I've red that it's better for binary classification problems
+
+```{python}
+loss_function = tnn.BCELoss()
+```
+
+## Optimizer
+
+
+I am using Adam optimizer.
+
+```{python}
+optimizer_Adam = torch.optim.Adam(model.parameters(), lr=0.01)
+```
+
+## Number of epochs
+
+```{python}
+num_epochs = 10000
+```
+
+## Models Comparison
+
+
+When I started working on this problem, I noticed that the 'simple' model that You have provided, does not get 'better' with more epochs. I wanted to see if more 'comples' models behave differently
+
+```{python}
+loss_list_1 = train_model(model, loss_function, torch.optim.Adam, num_epochs, 0.01)
+```
+
+```{python}
+loss_list_2 = train_model(model_2, loss_function, torch.optim.Adam, num_epochs, 0.01)
+```
+
+```{python}
+show_losses(loss_list_1, loss_list_2, "Simple Model", "Complex Model", "models", 10)
+```
+
+As we can see, the 'simple model' achieves loss value around 0.32, and complex model gets better loss value, but after some time it overfits, and the test loss value gets worse and worse.  
+We can also see that it takes less than 100 epochs to get the optimal loss value
+
+
+## Accuracy after training
+
+
+I will be using the 'simple' model You've provided for the rest of the notebook
+
+```{python}
+y_true = labels_test.numpy()
+with torch.no_grad():
+    y_proba = model(features_test)
+    y_predicted = 1*(y_proba > 0.5)
+
+y_predicted_np = y_predicted.numpy()
+y_proba_np = y_proba.numpy()
+
+print(f"Accuracy: {accuracy_score(y_true, y_predicted_np):.4f}")
+```
+
+## Confusion Matrix
+
+```{python}
+cm = confusion_matrix(y_true, y_predicted_np, normalize='true')
+disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[0, 1])
+disp.plot(cmap=plt.cm.Blues)
+plt.title("Confusion Matrix")
+plt.show()
+```
+
+## AUC Score and ROC Curve
+
+```{python}
+fpr, tpr, thresholds = roc_curve(y_true, y_proba_np)
+roc_auc = roc_auc_score(y_true, y_proba_np)
+
+plt.plot(fpr, tpr, label=f'Train ROC (AUC = {roc_auc:.2f})')
+plt.plot([0, 1], [0, 1], 'k--', label='Random classifier')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curve for features a0 and a3')
+plt.grid()
+plt.legend(loc='lower right')
+plt.show()
+```
+
+```{python}
 
 ```
